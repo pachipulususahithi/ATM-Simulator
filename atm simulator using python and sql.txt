@@ -1,0 +1,128 @@
+import sqlite3
+from getpass import getpass
+
+# Database setup
+def setup_database():
+    conn = sqlite3.connect("atm.db")
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+                        username TEXT PRIMARY KEY,
+                        password TEXT NOT NULL,
+                        balance REAL NOT NULL
+                     )''')
+    conn.commit()
+    return conn
+
+def insert_sample_data(conn):
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO users (username, password, balance) VALUES ('user1', 'password123', 1000.0)")
+        cursor.execute("INSERT INTO users (username, password, balance) VALUES ('user2', 'securepass', 500.0)")
+        cursor.execute("INSERT INTO users (username, password, balance) VALUES ('user3', 'password456', 1000.0)")
+        cursor.execute("INSERT INTO users (username, password, balance) VALUES ('user4', 'password589', 1000.0)")
+        cursor.execute("INSERT INTO users (username, password, balance) VALUES ('user5', 'hello123', 1000.0)")
+        cursor.execute("INSERT INTO users (username, password, balance) VALUES ('user6', 'user6123', 1000.0)")
+        cursor.execute("INSERT INTO users (username, password, balance) VALUES ('user7', 'password654', 1000.0)")
+        cursor.execute("INSERT INTO users (username, password, balance) VALUES ('user8', 'password897', 1000.0)")
+        
+        conn.commit()
+        print("Sample data inserted successfully.")
+    except sqlite3.IntegrityError:
+        print("Sample data already exists.")
+
+def authenticate_user(cursor):
+    username = input("Enter username: ")
+    for attempt in range(3):  # Allow up to 3 attempts
+        password = getpass(f"Enter password (Attempt {attempt + 1}/3): ")
+        cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
+        user = cursor.fetchone()
+        if user:
+            print("Login successful!")
+            return user
+        else:
+            print("Invalid password.")
+    print("Maximum attempts exceeded. Enter correct password.")
+    return None
+
+def display_balance(username, cursor):
+    cursor.execute("SELECT balance FROM users WHERE username = ?", (username,))
+    balance = cursor.fetchone()[0]
+    print(f"Current balance: {balance:.2f}")
+
+def credit_amount(username, cursor, conn):
+    amount = float(input("Enter amount to deposit: "))
+    if amount > 0:
+        cursor.execute("UPDATE users SET balance = balance + ? WHERE username = ?", (amount, username))
+        conn.commit()
+        print(f"{amount:.2f} credited to your account.")
+    else:
+        print("Invalid amount.")
+
+def debit_amount(username, cursor, conn):
+    amount = float(input("Enter amount to withdraw: "))
+    cursor.execute("SELECT balance FROM users WHERE username = ?", (username,))
+    current_balance = cursor.fetchone()[0]
+    if 0 < amount <= current_balance:
+        cursor.execute("UPDATE users SET balance = balance - ? WHERE username = ?", (amount, username))
+        conn.commit()
+        print(f"{amount:.2f} debited from your account.")
+    else:
+        print("Invalid amount or insufficient balance.")
+
+def change_password(username, cursor, conn):
+    old_password = getpass("Enter current password: ")
+    cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+    current_password = cursor.fetchone()[0]
+    if old_password == current_password:
+        new_password = getpass("Enter new password: ")
+        confirm_password = getpass("Confirm new password: ")
+        if new_password == confirm_password:
+            cursor.execute("UPDATE users SET password = ? WHERE username = ?", (new_password, username))
+            conn.commit()
+            print("Password changed successfully.")
+        else:
+            print("Passwords do not match.")
+    else:
+        print("Incorrect current password.")
+
+def atm_menu(username, cursor, conn):
+    while True:
+        print("\nATM Menu:")
+        print("1. Display Balance")
+        print("2. Credit Amount")
+        print("3. Debit Amount")
+        print("4. Change Password")
+        print("5. Exit")
+        choice = input("Select an option: ")
+
+        if choice == "1":
+            display_balance(username, cursor)
+        elif choice == "2":
+            credit_amount(username, cursor, conn)
+        elif choice == "3":
+            debit_amount(username, cursor, conn)
+        elif choice == "4":
+            change_password(username, cursor, conn)
+        elif choice == "5":
+            print("Thank you for using the ATM. Goodbye!")
+            break
+        else:
+            print("Invalid choice. Please try again.")
+
+# Main program
+def main():
+    conn = setup_database()
+    insert_sample_data(conn)  # Insert sample data if needed
+    cursor = conn.cursor()
+
+    print("Welcome to the ATM Simulator")
+    while True:
+        user = authenticate_user(cursor)
+        if user:
+            atm_menu(user[0], cursor, conn)
+            break
+
+    conn.close()
+
+if __name__ == "__main__":
+    main()
